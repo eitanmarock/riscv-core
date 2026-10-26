@@ -4,3 +4,4 @@ sim_build/
 *.fst
 __pycache__/
 results.xml
+sim_build_*/
