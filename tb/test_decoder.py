@@ -29,13 +29,14 @@ def i_type(imm12, rs1, funct3, rd):
 
 
 async def check(dut, instr, reg_write, alu_src, alu_op, valid, what,
-                mem_write=0, mem_to_reg=0):
+                mem_write=0, mem_to_reg=0, branch=0, jal=0):
     dut.instr.value = instr
     await Timer(1, unit="ns")
     got = (int(dut.reg_write.value), int(dut.alu_src.value),
            int(dut.alu_op.value), int(dut.valid.value),
-           int(dut.mem_write.value), int(dut.mem_to_reg.value))
-    exp = (reg_write, alu_src, alu_op, valid, mem_write, mem_to_reg)
+           int(dut.mem_write.value), int(dut.mem_to_reg.value),
+           int(dut.branch.value), int(dut.jal.value))
+    exp = (reg_write, alu_src, alu_op, valid, mem_write, mem_to_reg, branch, jal)
     assert got == exp, f"{what} instr={instr:#010x}: got {got}, expected {exp}"
 
 
@@ -75,9 +76,23 @@ async def decoder_memory(dut):
 
 
 @cocotb.test()
+async def decoder_branch_jal(dut):
+    for _ in range(500):
+        instr = (random.getrandbits(25) << 7) | 0b1100011
+        f3 = (instr >> 12) & 0b111
+        if f3 in (0b010, 0b011):
+            await check(dut, instr, 0, 0, 0, 0, "BRANCH bad funct3")
+        else:
+            await check(dut, instr, 0, 0, 0, 1, "BRANCH", branch=1)
+
+        instr = (random.getrandbits(25) << 7) | 0b1101111
+        await check(dut, instr, 1, 0, 0, 1, "JAL", jal=1)
+
+
+@cocotb.test()
 async def decoder_unsupported(dut):
-    # BRANCH, JAL, JALR are not implemented yet
-    for opcode in (0b1100011, 0b1101111, 0b1100111):
+    # JALR (and unknown opcodes) are not implemented yet
+    for opcode in (0b1100111, 0b0110111, 0b0010111, 0b1111111):
         for _ in range(100):
             instr = (random.getrandbits(25) << 7) | opcode
             await check(dut, instr, 0, 0, 0, 0, f"opcode={opcode:#09b}")

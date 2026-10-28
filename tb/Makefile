@@ -4,10 +4,10 @@ EXTRA_ARGS += --trace --trace-structs
 WAVES = 1
 
 # list of modules to test; each needs tb/test_<name>.py
-MODULES = alu regfile imm_gen decoder mem core
+MODULES = alu regfile imm_gen decoder mem branch_cmp core
 
 # modules that need more RTL files than their own
-SRCS_core = core mem decoder imm_gen regfile alu
+SRCS_core = core mem decoder imm_gen regfile alu branch_cmp
 
 ifneq ($(MOD),)
 
