@@ -3,12 +3,16 @@ TOPLEVEL_LANG = verilog
 EXTRA_ARGS += --trace --trace-structs
 WAVES = 1
 
-# list of modules to test; each needs rtl/<name>.sv and tb/test_<name>.py
-MODULES = alu regfile imm_gen decoder mem
+# list of modules to test; each needs tb/test_<name>.py
+MODULES = alu regfile imm_gen decoder mem core
+
+# modules that need more RTL files than their own
+SRCS_core = core mem decoder imm_gen regfile alu
 
 ifneq ($(MOD),)
 
-VERILOG_SOURCES = $(CURDIR)/../rtl/$(MOD).sv
+SRCS = $(if $(SRCS_$(MOD)),$(SRCS_$(MOD)),$(MOD))
+VERILOG_SOURCES = $(foreach s,$(SRCS),$(CURDIR)/../rtl/$(s).sv)
 COCOTB_TOPLEVEL = $(MOD)
 COCOTB_TEST_MODULES = test_$(MOD)
 SIM_BUILD = sim_build_$(MOD)

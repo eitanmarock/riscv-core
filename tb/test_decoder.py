@@ -28,12 +28,14 @@ def i_type(imm12, rs1, funct3, rd):
     return ((imm12 & 0xFFF) << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | 0b0010011
 
 
-async def check(dut, instr, reg_write, alu_src, alu_op, valid, what):
+async def check(dut, instr, reg_write, alu_src, alu_op, valid, what,
+                mem_write=0, mem_to_reg=0):
     dut.instr.value = instr
     await Timer(1, unit="ns")
     got = (int(dut.reg_write.value), int(dut.alu_src.value),
-           int(dut.alu_op.value), int(dut.valid.value))
-    exp = (reg_write, alu_src, alu_op, valid)
+           int(dut.alu_op.value), int(dut.valid.value),
+           int(dut.mem_write.value), int(dut.mem_to_reg.value))
+    exp = (reg_write, alu_src, alu_op, valid, mem_write, mem_to_reg)
     assert got == exp, f"{what} instr={instr:#010x}: got {got}, expected {exp}"
 
 
@@ -53,9 +55,29 @@ async def decoder_supported(dut):
 
 
 @cocotb.test()
+async def decoder_memory(dut):
+    for _ in range(500):
+        rd, rs1, rs2 = (random.randint(0, 31) for _ in range(3))
+        imm = random.getrandbits(12)
+        lw = ((imm << 20) | (rs1 << 15) | (0b010 << 12) | (rd << 7) | 0b0000011)
+        sw = (((imm >> 5) << 25) | (rs2 << 20) | (rs1 << 15) |
+              (0b010 << 12) | ((imm & 0x1F) << 7) | 0b0100011)
+        await check(dut, lw, 1, 1, 0, 1, "LW", mem_write=0, mem_to_reg=1)
+        await check(dut, sw, 0, 1, 0, 1, "SW", mem_write=1, mem_to_reg=0)
+
+        # other widths (LB, LH, SB, SH...) are not supported yet
+        bad_f3 = random.choice([0b000, 0b001, 0b100, 0b101])
+        await check(dut, (lw & ~(0b111 << 12)) | (bad_f3 << 12),
+                    0, 0, 0, 0, "LOAD bad funct3")
+        bad_f3 = random.choice([0b000, 0b001])
+        await check(dut, (sw & ~(0b111 << 12)) | (bad_f3 << 12),
+                    0, 0, 0, 0, "STORE bad funct3")
+
+
+@cocotb.test()
 async def decoder_unsupported(dut):
-    # opcodes we have not implemented yet must be flagged invalid, no write
-    for opcode in (0b0000011, 0b0100011, 0b1100011, 0b1101111, 0b1100111):
+    # BRANCH, JAL, JALR are not implemented yet
+    for opcode in (0b1100011, 0b1101111, 0b1100111):
         for _ in range(100):
             instr = (random.getrandbits(25) << 7) | opcode
             await check(dut, instr, 0, 0, 0, 0, f"opcode={opcode:#09b}")
