@@ -4,7 +4,7 @@ EXTRA_ARGS += --trace --trace-structs
 WAVES = 1
 
 # list of modules to test; each needs rtl/<name>.sv and tb/test_<name>.py
-MODULES = alu regfile imm_gen
+MODULES = alu regfile imm_gen decoder
 
 ifneq ($(MOD),)
 
