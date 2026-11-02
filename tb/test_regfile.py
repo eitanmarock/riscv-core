@@ -10,6 +10,7 @@ async def regfile_random(dut):
 
     ref = [0] * 32          # reference model in Python
     dut.we.value = 0
+    dut.rst.value = 0
     dut.rs1.value = 0
     dut.rs2.value = 0
     dut.rd.value = 0

@@ -45,14 +45,22 @@ def jal(rd, offset):
            (((o >> 11) & 1) << 20) | (((o >> 12) & 0xFF) << 12) | (rd << 7) | 0b1101111
 
 
+def lui(rd, imm20):
+    return ((imm20 & 0xFFFFF) << 12) | (rd << 7) | 0b0110111
+
+
+def auipc(rd, imm20):
+    return ((imm20 & 0xFFFFF) << 12) | (rd << 7) | 0b0010111
+
+
+def jalr(rd, rs1, imm):
+    return ((imm & 0xFFF) << 20) | (rs1 << 15) | (0b000 << 12) | (rd << 7) | 0b1100111
+
+
 async def run_program(dut, program, cycles=8):
     # clear instruction memory, then load the program
     for i in range(256):
         dut.imem.words[i].value = 0
-    for i in range(32):
-        dut.rf.regs[i].value = 0
-    for i in range(256):
-        dut.dmem.words[i].value = 0    
     for i, word in enumerate(program):
         dut.imem.words[i].value = word
 
@@ -127,3 +135,35 @@ async def core_jal(dut):
     assert reg(dut, 1) == 4, f"x1 = {reg(dut, 1)}"
     assert reg(dut, 2) == 0, "skipped instruction executed"
     assert reg(dut, 3) == 7    
+
+
+@cocotb.test()
+async def core_lui_auipc(dut):
+    await run_program(dut, [
+        lui(1, 0x12345),        # 0: x1 = 0x12345000
+        addi(1, 1, 0x678),      # 4: x1 = 0x12345678
+        auipc(2, 1),            # 8: x2 = 8 + 0x1000 = 0x1008
+    ], cycles=6)
+    assert reg(dut, 1) == 0x12345678, f"x1 = {reg(dut, 1):#x}"
+    assert reg(dut, 2) == 0x1008, f"x2 = {reg(dut, 2):#x}"
+
+
+@cocotb.test()
+async def core_jalr(dut):
+
+    await run_program(dut, [
+        addi(5, 0, 16),         # 0:  x5 = 16 (function address)
+        jalr(1, 5, 0),          # 4:  call: x1 = 8, jump to 16
+        addi(3, 0, 1),          # 8:  runs after the return: x3 = 1
+        jal(0, 16),             # 12: jump to 28 (end)
+        addi(2, 0, 42),         # 16: function: x2 = 42
+        jalr(0, 1, 0),          # 20: return to x1 (= 8)
+        addi(4, 0, 77),         # 24: never executed
+        addi(6, 0, 5),          # 28: end marker: x6 = 5
+    ], cycles=9)
+
+    assert reg(dut, 1) == 8, f"x1 = {reg(dut, 1)}"
+    assert reg(dut, 2) == 42, f"x2 = {reg(dut, 2)}"
+    assert reg(dut, 3) == 1, f"x3 = {reg(dut, 3)}"
+    assert reg(dut, 4) == 0, "dead code executed"
+    assert reg(dut, 6) == 5, f"x6 = {reg(dut, 6)}"

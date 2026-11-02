@@ -29,14 +29,17 @@ def i_type(imm12, rs1, funct3, rd):
 
 
 async def check(dut, instr, reg_write, alu_src, alu_op, valid, what,
-                mem_write=0, mem_to_reg=0, branch=0, jal=0):
+                mem_write=0, mem_to_reg=0, branch=0, jal=0,
+                jalr=0, lui=0, auipc=0):
     dut.instr.value = instr
     await Timer(1, unit="ns")
     got = (int(dut.reg_write.value), int(dut.alu_src.value),
            int(dut.alu_op.value), int(dut.valid.value),
            int(dut.mem_write.value), int(dut.mem_to_reg.value),
-           int(dut.branch.value), int(dut.jal.value))
-    exp = (reg_write, alu_src, alu_op, valid, mem_write, mem_to_reg, branch, jal)
+           int(dut.branch.value), int(dut.jal.value),
+           int(dut.jalr.value), int(dut.lui.value), int(dut.auipc.value))
+    exp = (reg_write, alu_src, alu_op, valid, mem_write, mem_to_reg,
+           branch, jal, jalr, lui, auipc)
     assert got == exp, f"{what} instr={instr:#010x}: got {got}, expected {exp}"
 
 
@@ -76,23 +79,25 @@ async def decoder_memory(dut):
 
 
 @cocotb.test()
-async def decoder_branch_jal(dut):
+async def decoder_upper_and_jalr(dut):
     for _ in range(500):
-        instr = (random.getrandbits(25) << 7) | 0b1100011
-        f3 = (instr >> 12) & 0b111
-        if f3 in (0b010, 0b011):
-            await check(dut, instr, 0, 0, 0, 0, "BRANCH bad funct3")
-        else:
-            await check(dut, instr, 0, 0, 0, 1, "BRANCH", branch=1)
+        base = random.getrandbits(25) << 7
 
-        instr = (random.getrandbits(25) << 7) | 0b1101111
-        await check(dut, instr, 1, 0, 0, 1, "JAL", jal=1)
+        await check(dut, base | 0b0110111, 1, 0, 0, 1, "LUI", lui=1)
+        await check(dut, base | 0b0010111, 1, 0, 0, 1, "AUIPC", auipc=1)
+
+        jalr_ok = (base & ~(0b111 << 12)) | 0b1100111
+        await check(dut, jalr_ok, 1, 1, 0, 1, "JALR", jalr=1)
+
+        bad_f3 = random.randint(1, 7)
+        jalr_bad = (base & ~(0b111 << 12)) | (bad_f3 << 12) | 0b1100111
+        await check(dut, jalr_bad, 0, 0, 0, 0, "JALR bad funct3")
 
 
 @cocotb.test()
 async def decoder_unsupported(dut):
-    # JALR (and unknown opcodes) are not implemented yet
-    for opcode in (0b1100111, 0b0110111, 0b0010111, 0b1111111):
+    # unknown opcodes must be flagged invalid
+    for opcode in (0b1111111, 0b0001111, 0b1110011):
         for _ in range(100):
             instr = (random.getrandbits(25) << 7) | opcode
             await check(dut, instr, 0, 0, 0, 0, f"opcode={opcode:#09b}")

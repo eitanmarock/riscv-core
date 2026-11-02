@@ -5,8 +5,11 @@ module decoder (
     output logic [3:0]  alu_op,
     output logic        mem_write,
     output logic        mem_to_reg,
-    output logic        branch,      // 1 = conditional branch
-    output logic        jal,         // 1 = JAL
+    output logic        branch,
+    output logic        jal,
+    output logic        jalr,
+    output logic        lui,
+    output logic        auipc,
     output logic        valid
 );
     logic [6:0] opcode;
@@ -25,6 +28,9 @@ module decoder (
         mem_to_reg = 1'b0;
         branch     = 1'b0;
         jal        = 1'b0;
+        jalr       = 1'b0;
+        lui        = 1'b0;
+        auipc      = 1'b0;
         valid      = 1'b0;
 
         case (opcode)
@@ -72,7 +78,7 @@ module decoder (
                     valid     = 1'b1;
                 end
             end
-            7'b1100011: begin  // BRANCH (funct3 010 and 011 do not exist)
+            7'b1100011: begin  // BRANCH
                 if (funct3 != 3'b010 && funct3 != 3'b011) begin
                     branch = 1'b1;
                     valid  = 1'b1;
@@ -81,6 +87,25 @@ module decoder (
             7'b1101111: begin  // JAL
                 reg_write = 1'b1;
                 jal       = 1'b1;
+                valid     = 1'b1;
+            end
+            7'b1100111: begin  // JALR (funct3 must be 000)
+                if (funct3 == 3'b000) begin
+                    reg_write = 1'b1;
+                    alu_src   = 1'b1;   // target = rs1 + imm
+                    alu_op    = 4'd0;
+                    jalr      = 1'b1;
+                    valid     = 1'b1;
+                end
+            end
+            7'b0110111: begin  // LUI
+                reg_write = 1'b1;
+                lui       = 1'b1;
+                valid     = 1'b1;
+            end
+            7'b0010111: begin  // AUIPC
+                reg_write = 1'b1;
+                auipc     = 1'b1;
                 valid     = 1'b1;
             end
             default: ;

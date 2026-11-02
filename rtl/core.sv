@@ -10,14 +10,19 @@ module core #(
     logic [31:0] rdata1, rdata2;
     logic [31:0] alu_b, alu_y;
     logic [31:0] dmem_rdata, rd_data;
-    logic        reg_write, alu_src, mem_write, mem_to_reg, branch, jal, valid;
+    logic        reg_write, alu_src, mem_write, mem_to_reg;
+    logic        branch, jal, jalr, lui, auipc, valid;
     logic        taken;
     logic [3:0]  alu_op;
 
     assign pc_plus4 = pc + 32'd4;
 
-    // jump if JAL, or if a branch whose condition holds
-    assign pc_next = (jal || (branch && taken)) ? (pc + imm) : pc_plus4;
+    // next pc: JALR target, or pc+imm for JAL / taken branch, or pc+4
+    always_comb begin
+        if (jalr)                       pc_next = alu_y & 32'hFFFFFFFE;
+        else if (jal || (branch && taken)) pc_next = pc + imm;
+        else                            pc_next = pc_plus4;
+    end
 
     always_ff @(posedge clk) begin
         if (rst) pc <= 32'd0;
@@ -31,13 +36,14 @@ module core #(
     decoder dec (
         .instr(instr), .reg_write(reg_write), .alu_src(alu_src),
         .alu_op(alu_op), .mem_write(mem_write), .mem_to_reg(mem_to_reg),
-        .branch(branch), .jal(jal), .valid(valid)
+        .branch(branch), .jal(jal), .jalr(jalr), .lui(lui),
+        .auipc(auipc), .valid(valid)
     );
 
     imm_gen ig (.instr(instr), .imm(imm));
 
     regfile rf (
-        .clk(clk), .we(reg_write), .rs1(instr[19:15]), .rs2(instr[24:20]),
+        .clk(clk), .rst(rst), .we(reg_write), .rs1(instr[19:15]), .rs2(instr[24:20]),
         .rd(instr[11:7]), .wdata(rd_data), .rdata1(rdata1), .rdata2(rdata2)
     );
 
@@ -51,6 +57,12 @@ module core #(
         .clk(clk), .we(mem_write), .addr(alu_y), .wdata(rdata2), .rdata(dmem_rdata)
     );
 
-    // JAL writes the return address (pc + 4); LW writes memory data
-    assign rd_data = jal ? pc_plus4 : (mem_to_reg ? dmem_rdata : alu_y);
+    // value written to rd
+    always_comb begin
+        if (jal || jalr)   rd_data = pc_plus4;       // return address
+        else if (lui)      rd_data = imm;
+        else if (auipc)    rd_data = pc + imm;
+        else if (mem_to_reg) rd_data = dmem_rdata;
+        else               rd_data = alu_y;
+    end
 endmodule
