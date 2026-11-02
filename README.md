@@ -16,8 +16,9 @@ Work in progress. Currently implemented and tested:
 | Arithmetic / logic (I-type) | ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI |
 | Memory | LW, SW |
 | Control flow | BEQ, BNE, BLT, BGE, BLTU, BGEU, JAL |
+| Upper immediates / jumps | LUI, AUIPC, JALR |
 
-Not implemented yet: LUI, AUIPC, JALR, byte/halfword loads and stores,
+Not implemented yet: byte/halfword loads and stores,
 CSRs, interrupts.
 
 ## Architecture
@@ -85,7 +86,7 @@ docs/  documentation
 
 ## Roadmap
 
-- [ ] LUI, AUIPC, JALR
+- [x] LUI, AUIPC, JALR
 - [ ] Byte and halfword loads and stores
 - [ ] Cross-check against Spike (official RISC-V ISA simulator) instruction by instruction
 - [ ] Run the official riscv-arch-test suite
