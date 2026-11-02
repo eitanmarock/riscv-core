@@ -96,5 +96,4 @@ docs/  documentation
 
 ## Author
 
-Eitan Marock, B.Sc. Electrical and Electronics Engineering, Ariel University.
-[LinkedIn](https://www.linkedin.com/in/eitan-marock/)
+Eitan Marock · [LinkedIn](https://www.linkedin.com/in/eitan-marock/)
